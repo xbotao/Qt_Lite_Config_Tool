@@ -13,6 +13,7 @@ public:
     QString strSection;
     QString strPurpose;
     QString configFile;
+    int iType;
 //    QVector<QString> listStrOutput;
     QVector<QtConfigItem> childrens;
 

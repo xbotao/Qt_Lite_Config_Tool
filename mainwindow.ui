@@ -103,6 +103,12 @@
            </item>
            <item row="1" column="0" colspan="3">
             <widget class="QTreeWidget" name="treeWidget">
+             <property name="minimumSize">
+              <size>
+               <width>500</width>
+               <height>0</height>
+              </size>
+             </property>
              <column>
               <property name="text">
                <string notr="true">1</string>

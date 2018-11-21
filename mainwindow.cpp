@@ -10,6 +10,8 @@ MainWindow::MainWindow(QWidget *parent) :
     QStringList strLDisType;
     strLDisType << tr("Default") << tr("All") << tr("Available");
     ui->comboDisType->addItems(strLDisType);
+
+    initTreeWidget();
 }
 
 MainWindow::~MainWindow()
@@ -33,7 +35,7 @@ void MainWindow::on_pushBtn_BrowseConfig_clicked()
     //选择文件夹
     QString strConfigFile = QFileDialog::getOpenFileName(nullptr,
                                                         tr("select Build Directory"),
-                                                        tr("E:/work/QtBuild/5.11.2/src/"),
+                                                        tr("E:/work/5.11.2/src/"),
                                                         tr("config file (*.json)"));
     if(!strConfigFile.isEmpty())
     {
@@ -62,6 +64,8 @@ void MainWindow::on_pushBtn_BrowseConfig_clicked()
             m_ConfigItem.childrens.append(item);
         }
     }
+
+    addItems2Tree();
 }
 
 QtConfigItem MainWindow::parseConfigFile(QString strConfigFile)
@@ -75,8 +79,15 @@ QtConfigItem MainWindow::parseConfigFile(QString strConfigFile)
     QtConfigItem configItem;
     configItem.configFile = strConfigFile;
     configItem.strItemName = strLabel;
+    configItem.iType = cfgType_null;
 
     //qDebug() << "\r\n"<<strConfigFile<<"--------------";
+
+    if(jsonObject.contains("module"))
+    {
+        configItem.iType = cfgType_module;
+        configItem.strItemName = jsonObject.value("module").toString()+"_module";
+    }
 
      if(jsonObject.contains("subconfigs"))
      {
@@ -96,6 +107,8 @@ QtConfigItem MainWindow::parseConfigFile(QString strConfigFile)
      else if(jsonObject.contains("features"))
      {
          QJsonObject featureObj = jsonObject.value("features").toObject();
+         QVector<QtConfigItem> sections;
+
          for(int i=0; i<featureObj.keys().size(); i++)
          {
              QString key = featureObj.keys().at(i);
@@ -105,38 +118,84 @@ QtConfigItem MainWindow::parseConfigFile(QString strConfigFile)
                  continue;
 
              QtConfigItem item;
-             item.configFile = strConfigFile;
-             if(obj.contains("label"))
-             {
-                 item.strItemName = obj.value("label").toString();
-             }
+             item.configFile = strConfigFile;             
+             item.strItemName = key;
+             item.strPurpose = obj.value("purpose").toString();
+             item.iType = cfgType_feature;
+
              if(obj.contains("section"))
              {
                 item.strSection = obj.value("section").toString();
              }
-             if(obj.contains("purpose"))
+
+             bool bHasSection = false;
+             for(int i=0; i<sections.size(); i++)
              {
-                 item.strPurpose = obj.value("purpose").toString();
+                 if(sections.at(i).strItemName == item.strSection)
+                 {
+                     sections[i].childrens.append(item);
+                     bHasSection = true;
+                     break;
+                 }
              }
 
-             configItem.childrens.append(item);
+             if(!bHasSection)
+             {
+                QtConfigItem section;
+                section.strItemName = item.strSection;
+                section.iType = cfgType_section;
+                section.childrens.append(item);
+                sections.append(section);
+             }
+
+             //configItem.childrens.append(item);
              itemCount++;
 
              QString strItemInfo = QString("%1 %2:%3")
                      .arg(key, -35, '.')
                      .arg(item.strSection)
                      .arg(item.strPurpose);
-
-
-//            qDebug() << "itemCount " << itemCount << ":" << strItemInfo;
          }
 
+         configItem.childrens.append(sections);
      }
 
      return configItem;
 }
 
-void MainWindow::add2TreeWidget()
+void MainWindow::initTreeWidget()
 {
+    ui->treeWidget->setColumnCount(1);
+    //ui->treeWidget->setColumnWidth(0, 300);
+    ui->treeWidget->setHeaderLabels(QStringList()<<"Name"/*<<"Enabled"*/);
+}
 
+void MainWindow::addChild2Tree(QTreeWidgetItem *parent, QtConfigItem config)
+{
+    foreach (QtConfigItem item, config.childrens) {
+        QTreeWidgetItem *treeItem = new QTreeWidgetItem();
+        treeItem->setText(0, item.strItemName);
+        if(item.iType == cfgType_feature)
+        {
+            treeItem->setFlags(Qt::ItemIsEditable | Qt::ItemIsUserCheckable | Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+            treeItem->setCheckState (0, Qt::Checked);   //复选框
+        }
+        //treeItem->setText(1, QString("%1").arg(item.iType));
+        parent->addChild(treeItem);
+
+        if(item.childrens.size() > 0)
+        {
+            addChild2Tree(treeItem, item);
+        }
+    }
+}
+
+void MainWindow::addItems2Tree()
+{
+    QTreeWidgetItem *treeItem = new QTreeWidgetItem();
+    treeItem->setText(0, m_ConfigItem.strItemName);
+    //treeItem->setText(1, "");
+    ui->treeWidget->addTopLevelItem(treeItem);
+
+    addChild2Tree(treeItem, m_ConfigItem);
 }
